@@ -1,96 +1,75 @@
-# Which simulated driving tests are worth running?
+# scenario-quality
 
-Automated driving functions are increasingly tested in simulation, using thousands of generated scenarios. But a generated scenario is not automatically a good test. This project checks each scenario automatically and shows how many good tests are left.
+Checks whether generated driving scenarios are actually useful as simulation tests.
 
-![Three cut-in scenarios simulated in esmini](docs/cutin_examples.gif)
+I wrote a parameter sweep for a simple highway cut-in (a car merges into the ego lane), exported every combination as an OpenSCENARIO file, ran them in [esmini](https://github.com/esmini/esmini) and checked each run for three things:
 
-*Three of the 144 scenarios, simulated in esmini (top view). Only the first is a useful test.*
+1. Is the scenario valid? It has to run, start in a consistent state, move in a physically plausible way, and the cut-in has to actually happen.
+2. Does the ego have to react at all?
+3. How critical is it? Measured as how hard the ego would have to brake after a 0.5 s reaction time.
 
-## In 30 seconds
+![Three of the scenarios in esmini](docs/cutin_examples.gif)
 
-- I generated **144 highway cut-in scenarios** (another car merges in front of you) as standard OpenSCENARIO files and ran them in the esmini simulator.
-- **Only 9 of them are distinct, valid tests that a car could pass.** The rest never trigger the cut-in, move in physically impossible ways, need no reaction, cannot be passed by any car, or repeat another test.
-- **The result is robust.** Changing one assumption at a time (reaction time, plausibility limit, what counts as "has to react") gives between 4 and 15 useful tests, never more than about 1 in 10.
-- **The checker is itself tested.** I injected 6 typical scenario bugs into 57 scenarios. It caught 340 of the 342 broken files; the 2 misses are unit errors that happen to produce realistic speeds.
+Top: a useful test. Middle: the car merges so close that a crash is unavoidable. Bottom: a 1 s lane change, which no real car does.
 
-![From 144 generated scenarios to 9 useful tests](docs/fig1_funnel.png)
+## Results
 
-## How it works
+Of 144 generated scenarios, 57 are valid, 39 require a reaction, and 27 are still passable. Many of those are near-duplicates (same speed difference, gap and lane-change time, only the ego speed differs), which leaves 9 distinct tests.
 
-```mermaid
-flowchart LR
-    A[Parameter sweep<br/>speeds, gap, lane-change time] --> B[OpenSCENARIO files<br/>.xosc + .xodr]
-    B --> C[esmini<br/>headless simulation]
-    C --> D[Trajectory logs]
-    D --> E{1. Valid?}
-    E -- no --> X[Reject, with reason]
-    E -- yes --> F{2. Does the car<br/>have to react?}
-    F -- no --> Y[Not a useful test]
-    F -- yes --> G[3. How hard is it?<br/>low / medium / high / unavoidable]
-```
+![Funnel](docs/fig1_funnel.png)
 
-The three questions are asked in order. Each verdict comes with the reason, so a test engineer can fix the scenario instead of just dropping it.
+![Verdict per scenario](docs/fig2_grid.png)
 
-## What the checks found
+Some things I did not expect:
 
-![Verdict for every scenario in the sweep](docs/fig2_grid.png)
+- 54 scenarios never trigger the cut-in. The trigger is "gap below X m", and if the other car is not slower than the ego, the gap never shrinks.
+- All 1 s lane changes are implausible (14 to 18 m/s² lateral acceleration).
+- The ego speed makes no difference to the criticality class here, because the required braking only depends on relative speed and gap.
+- A slower lane change makes the cut-in more critical, not less: the car enters the lane later, when the gap is already smaller.
 
-*Each cell is one scenario. Grey cells are invalid, blue cells are useful tests (darker means harder), red cells cannot be passed by any car.*
+![Example trajectories](docs/fig3_examples.png)
 
-1. **A third of the sweep never does anything.** If the merging car is as fast as you or faster, the gap never shrinks, so the cut-in is never triggered (T).
-2. **A 1-second lane change is never realistic.** It needs 14 to 18 m/s² of sideways acceleration; everyday lane changes typically stay below about 3 (P).
-3. **Your own speed barely matters here.** The three horizontal blocks (80, 100, 120 km/h) look the same, because how hard you have to brake depends on the speed difference and the gap. Two thirds of the useful tests are near-copies.
-4. **A slower lane change can be more dangerous.** The merging car reaches your lane later, and therefore closer.
+## Does the checker catch bugs?
 
-![Four example scenarios](docs/fig3_examples.png)
+I took the 57 scenarios that passed and broke each of them in six ways:
 
-## Testing the checker
+| Bug | Caught |
+|---|---|
+| cars spawned inside each other | 57 / 57 |
+| car spawned off the road | 57 / 57 |
+| car teleports 30 m | 57 / 57 |
+| lane change in 0.3 s | 57 / 57 |
+| trigger that can never fire | 57 / 57 |
+| speed written in km/h instead of m/s | 55 / 57 |
 
-A checker is only useful if it catches real bugs. I injected each bug below into all 57 scenarios that passed the checks, and counted how often the result was rejected.
+The two misses are unit errors where 40 km/h became 144 km/h. That is still a normal highway speed, so a physics check cannot see it.
 
-| Injected bug | What it imitates | Caught |
-|---|---|---|
-| Spawn overlap | the two cars start inside each other | 57 / 57 |
-| Off road | a car starts next to the road | 57 / 57 |
-| Teleport | a car jumps 30 m forward | 57 / 57 |
-| Snap lane change | a lane change in 0.3 s | 57 / 57 |
-| Dead trigger | the cut-in condition can never be met | 57 / 57 |
-| Unit error | a speed written in km/h instead of m/s | 55 / 57 |
+## How sensitive is this to my thresholds?
 
-The 2 missed unit errors turned 40 km/h into 144 km/h, which is still a realistic highway speed. Such bugs cannot be caught by physics checks alone.
+Changing one threshold at a time (reaction time, lateral acceleration limit, relevance criterion, max braking) gives between 4 and 15 distinct tests instead of 9. The lateral acceleration limit matters most, because it decides whether 2 s lane changes (about 4 m/s²) count as plausible. Full table in [docs/TECHNICAL.md](docs/TECHNICAL.md#44-sensitivity).
 
-I also checked the other direction: 3 scenarios that I expected to be fine were rejected. In all 3 the car is already next to you when it starts to merge, so the planned cut-in cannot happen. The checker was right and my expectation was wrong.
+## Notes
 
-## Why this matters
+- My first version drove the ego with esmini's built-in ACC controller. It braked from 100 km/h to under 10 km/h in about one second, which is not physically possible, so the criticality numbers were meaningless. I switched to a constant-speed ego and compute the required braking instead. This measures the scenario, not a particular driving function.
+- Three scenarios I expected to be fine were rejected. In those, the ego is already next to the other car when it starts to merge, so the checker was right.
 
-Simulation-based validation runs many scenarios, and each run costs compute and review time. Invalid or redundant scenarios also make coverage numbers look better than they are. The same checks apply whether scenarios are written by hand, found by search, or generated by an LLM.
+## Limitations
 
-## Honest limits
+- Only one manoeuvre, on a straight road, in one simulator.
+- Thresholds are reasonable defaults, not calibrated on real driving data.
+- "Near-duplicate" is defined by parameters. A real driving function might behave differently at 80 and 120 km/h.
 
-- One scenario type (cut-in) on a straight road, in one simulator (esmini).
-- The limits (for example 5 m/s² sideways, 0.5 s reaction time) are reasonable defaults, not calibrated on real driving data.
-- Difficulty is measured for the scenario, not for a specific driving function: the ego drives at constant speed, and I compute how hard it would have to brake after a 0.5 s reaction time.
-- "Near-copy" means same speed difference, gap and lane-change time. A real driving function might behave differently at 80 and 120 km/h.
+Next things I want to try: running the same files in CARLA ScenarioRunner to see whether the verdicts agree, and checking scenarios written by an LLM from text descriptions.
 
-## Next steps
-
-- Run the same files in CARLA (ScenarioRunner) and check whether the verdicts agree across simulators.
-- More scenario types and real road networks (OpenDRIVE maps).
-- Let an LLM write scenarios from text descriptions and measure how many pass these checks.
-
-## Run it
+## Usage
 
 ```bash
 pip install -r requirements.txt
-bash scripts/get_esmini.sh                                         # esmini for Linux x86-64
+bash scripts/get_esmini.sh          # downloads esmini (Linux x86-64)
 ESMINI_BIN=esmini/bin/esmini python scripts/pipeline.py --out outputs
 python scripts/report.py --out outputs --docs docs
 python scripts/sensitivity.py --out outputs
 pytest -q
 ```
 
-The animation is recorded with `xvfb-run -a -s "-screen 0 1280x720x24" python scripts/record_gif.py`.
-
-Details: [technical report](docs/TECHNICAL.md). Built on [esmini](https://github.com/esmini/esmini), [scenariogeneration](https://github.com/pyoscx/scenariogeneration) and ASAM OpenSCENARIO / OpenDRIVE. Results in `reports/`.
-
-Author: Haoxiang Gao
+The GIF is made with `xvfb-run -a -s "-screen 0 1280x720x24" python scripts/record_gif.py`. Per-scenario results are in `reports/`, details in [docs/TECHNICAL.md](docs/TECHNICAL.md).

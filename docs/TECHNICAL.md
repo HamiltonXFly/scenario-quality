@@ -53,7 +53,7 @@ Let *t*ₑ be the first time step at which the target overlaps the ego lane late
 
 ### 3.3 Criticality
 
-The ego does not react in the simulation, so criticality is a property of the scenario rather than of a driving function. At *t*ₑ, with bumper gap *g*, closing speed Δ*v* > 0 and reaction time τ = 0.5 s:
+The ego does not react in the simulation, so criticality is a property of the scenario rather than of a driving function. (A first version used esmini's built-in ACC controller for the ego; it decelerated from 100 km/h to below 10 km/h within about 1 s, far beyond physical limits, so its responses could not be used to rate criticality.) At *t*ₑ, with bumper gap *g*, closing speed Δ*v* > 0 and reaction time τ = 0.5 s:
 
   *a*_req = Δ*v*² / (2 (*g* − Δ*v* τ))
 
