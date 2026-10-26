@@ -111,6 +111,24 @@ The two missed mutants have a target speed of 40 m/s (144 km/h) after the error,
 
 Sanity check in the other direction: of 60 scenarios that were valid by design (lane change ≥ 2 s and a trigger that can fire), 3 were rejected. All 3 are true problems (the ego is already alongside the target), not false alarms.
 
+### 4.4 Sensitivity
+
+The logged runs were re-assessed with one assumption changed at a time (`scripts/sensitivity.py`, no new simulation):
+
+| Variant | Valid | Relevant | Passable | Distinct |
+|---|---|---|---|---|
+| Baseline | 57 | 39 | 27 | 9 |
+| Reaction time 0.3 s | 57 | 39 | 28 | 10 |
+| Reaction time 1.0 s | 57 | 40 | 22 | 8 |
+| Lateral limit 3 m/s² | 27 | 18 | 12 | 4 |
+| Lateral limit 7 m/s² | 57 | 39 | 27 | 9 |
+| Relevant if headway < 0.5 s or braking > 0.25 m/s² | 57 | 45 | 33 | 11 |
+| Relevant if headway < 2.0 s or braking > 1.0 m/s² | 57 | 53 | 41 | 15 |
+| Max ego braking 6 m/s² | 57 | 39 | 26 | 9 |
+| Max ego braking 10 m/s² | 57 | 39 | 27 | 9 |
+
+The number of distinct, passable tests ranges from 4 to 15 of 144. The qualitative conclusion (most of a naive sweep is not useful) holds in every variant. The exact count depends most on the lateral-acceleration limit, which decides whether 2 s lane changes (peak about 4 m/s²) are plausible, and on the definition of relevance. Reaction time and braking capability matter little.
+
 ## 5. Limitations
 
 - One manoeuvre on a straight road, one simulator. Curved roads and junctions need lane-relative instead of world-x distances.
@@ -132,7 +150,8 @@ pip install -r requirements.txt
 bash scripts/get_esmini.sh
 ESMINI_BIN=esmini/bin/esmini python scripts/pipeline.py --out outputs
 python scripts/report.py --out outputs --docs docs
+python scripts/sensitivity.py --out outputs
 pytest -q
 ```
 
-Per-scenario results: `reports/grid_results.csv`, `reports/defect_results.csv`, summary in `reports/summary.json`. Thresholds are in `sq/assess.py`.
+Per-scenario results: `reports/grid_results.csv`, `reports/defect_results.csv`, summary in `reports/summary.json`, sensitivity in `reports/sensitivity.csv`. Thresholds are in `sq/assess.py`.

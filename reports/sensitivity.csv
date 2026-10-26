@@ -1,0 +1,10 @@
+variant,valid,relevant,passable,distinct,distinct_with_ego_speed
+baseline,57,39,27,9,27
+reaction time 0.3 s,57,39,28,10,28
+reaction time 1.0 s,57,40,22,8,22
+lateral limit 3 m/s²,27,18,12,4,12
+lateral limit 7 m/s²,57,39,27,9,27
+relevant if headway < 0.5 s or braking > 0.25 m/s²,57,45,33,11,33
+relevant if headway < 2.0 s or braking > 1.0 m/s²,57,53,41,15,41
+max ego braking 6 m/s²,57,39,26,9,26
+max ego braking 10 m/s²,57,39,27,9,27

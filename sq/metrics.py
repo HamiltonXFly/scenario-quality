@@ -41,7 +41,7 @@ def smooth(a: np.ndarray, k: int = 5) -> np.ndarray:
     return np.convolve(pad, np.ones(k) / k, mode="valid")
 
 
-def compute(path: str) -> dict:
+def compute(path: str, reaction_time: float = REACTION_TIME) -> dict:
     d = load_log(path)
     e, g = d["Ego"], d["Target"]
     t = e["t"].to_numpy()
@@ -80,7 +80,7 @@ def compute(path: str) -> dict:
     i = int(np.argmax(in_path))                  # first step the target is in the ego path
     rel_v = e["v"].iloc[i] - v_t[i]
     gap_i = float(gap[i])
-    gap_eff = gap_i - max(rel_v, 0.0) * REACTION_TIME
+    gap_eff = gap_i - max(rel_v, 0.0) * reaction_time
     if gap_i <= 0 or (rel_v > 0 and gap_eff <= 0):
         a_req = float("inf")                     # already touching, or contact before braking starts
     elif rel_v > 0:

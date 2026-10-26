@@ -2,10 +2,15 @@
 
 Automated driving functions are increasingly tested in simulation, using thousands of generated scenarios. But a generated scenario is not automatically a good test. This project checks each scenario automatically and shows how many good tests are left.
 
+![Three cut-in scenarios simulated in esmini](docs/cutin_examples.gif)
+
+*Three of the 144 scenarios, simulated in esmini (top view). Only the first is a useful test.*
+
 ## In 30 seconds
 
 - I generated **144 highway cut-in scenarios** (another car merges in front of you) as standard OpenSCENARIO files and ran them in the esmini simulator.
 - **Only 9 of them are distinct, valid tests that a car could pass.** The rest never trigger the cut-in, move in physically impossible ways, need no reaction, cannot be passed by any car, or repeat another test.
+- **The result is robust.** Changing one assumption at a time (reaction time, plausibility limit, what counts as "has to react") gives between 4 and 15 useful tests, never more than about 1 in 10.
 - **The checker is itself tested.** I injected 6 typical scenario bugs into 57 scenarios. It caught 340 of the 342 broken files; the 2 misses are unit errors that happen to produce realistic speeds.
 
 ![From 144 generated scenarios to 9 useful tests](docs/fig1_funnel.png)
@@ -80,8 +85,11 @@ pip install -r requirements.txt
 bash scripts/get_esmini.sh                                         # esmini for Linux x86-64
 ESMINI_BIN=esmini/bin/esmini python scripts/pipeline.py --out outputs
 python scripts/report.py --out outputs --docs docs
+python scripts/sensitivity.py --out outputs
 pytest -q
 ```
+
+The animation is recorded with `xvfb-run -a -s "-screen 0 1280x720x24" python scripts/record_gif.py`.
 
 Details: [technical report](docs/TECHNICAL.md). Built on [esmini](https://github.com/esmini/esmini), [scenariogeneration](https://github.com/pyoscx/scenariogeneration) and ASAM OpenSCENARIO / OpenDRIVE. Results in `reports/`.
 
