@@ -1,0 +1,33 @@
+{
+ "grid_size": 144,
+ "verdicts": {
+  "invalid": 87,
+  "useful": 39,
+  "no_interaction": 18
+ },
+ "criticality": {
+  "low": 15,
+  "unavoidable": 12,
+  "medium": 6,
+  "high": 6
+ },
+ "by_design_valid": 60,
+ "by_design_valid_but_flagged": [
+  "cutin_v80_dv-40_g10_t4",
+  "cutin_v100_dv-40_g10_t4",
+  "cutin_v120_dv-40_g10_t4"
+ ],
+ "mutation_base": 57,
+ "detected": {
+  "dead_trigger": 57,
+  "off_road": 57,
+  "snap_lane_change": 57,
+  "spawn_overlap": 57,
+  "teleport": 57,
+  "unit_error": 55
+ },
+ "missed": [
+  "cutin_v80_dv-40_g60_t2__unit_error",
+  "cutin_v80_dv-40_g60_t4__unit_error"
+ ]
+}

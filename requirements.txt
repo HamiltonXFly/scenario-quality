@@ -1,0 +1,5 @@
+scenariogeneration==0.16.7
+numpy
+pandas
+matplotlib
+pytest
