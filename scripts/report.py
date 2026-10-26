@@ -23,14 +23,14 @@ from sq import metrics  # noqa: E402
 
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 CLASS_STYLE = {   # label, fill, text colour
-    "trigger": ("cut-in never happens", "#d3d2cd", INK),
-    "implausible": ("physically implausible", "#a3a29c", INK),
-    "contact": ("ego already alongside", "#7b7a75", "white"),
+    "trigger": ("invalid: cut-in never happens", "#d3d2cd", INK),
+    "implausible": ("invalid: implausible motion", "#a3a29c", INK),
+    "contact": ("invalid: ego already alongside", "#7b7a75", "white"),
     "no_interaction": ("no reaction needed", "#f3f2ee", INK),
-    "low": ("low", "#b9d3f2", INK),
-    "medium": ("medium", "#6fa3e6", INK),
-    "high": ("high", "#2a5fae", "white"),
-    "unavoidable": ("unavoidable", "#e34948", "white"),
+    "low": ("useful, low criticality", "#b9d3f2", INK),
+    "medium": ("useful, medium", "#6fa3e6", INK),
+    "high": ("useful, high", "#2a5fae", "white"),
+    "unavoidable": ("crash unavoidable", "#e34948", "white"),
 }
 ABBR = {"trigger": "T", "implausible": "P", "contact": "S", "no_interaction": "–",
         "low": "L", "medium": "M", "high": "H", "unavoidable": "U"}
@@ -69,8 +69,12 @@ def funnel(df: pd.DataFrame, out: Path) -> dict:
 
 def grid_map(df: pd.DataFrame, out: Path) -> None:
     df = df.assign(cls=df.apply(cls, axis=1))
+    # the verdicts are identical for every ego speed, so one block is enough
+    per_speed = df.pivot_table(index=["dv_kmh", "gap_m", "t_lc_s"], columns="v_ego_kmh", values="cls", aggfunc="first")
+    assert (per_speed.nunique(axis=1) == 1).all(), "verdicts differ between ego speeds"
+    df = df[df.v_ego_kmh == 100]
     vs, dvs, gaps, ts = sorted(df.v_ego_kmh.unique()), sorted(df.dv_kmh.unique()), sorted(df.gap_m.unique()), sorted(df.t_lc_s.unique())
-    fig, ax = plt.subplots(figsize=(9.2, 6.2))
+    fig, ax = plt.subplots(figsize=(9.2, 3.4))
     for r in df.itertuples():
         row = vs.index(r.v_ego_kmh) * len(dvs) + dvs.index(r.dv_kmh)
         col = ts.index(r.t_lc_s) * len(gaps) + gaps.index(r.gap_m)
@@ -86,16 +90,13 @@ def grid_map(df: pd.DataFrame, out: Path) -> None:
     ax.set_yticks([r + 0.5 for r in range(nrow)], [f"{d:+g}" for _ in vs for d in dvs], fontsize=8)
     for k, t in enumerate(ts):
         ax.text(k * len(gaps) + len(gaps) / 2, -0.9, f"lane change in {t:g} s", ha="center", color=INK)
-    for k, v in enumerate(vs):
-        ax.text(ncol + 0.3, k * len(dvs) + len(dvs) / 2, f"ego\n{v:g} km/h", va="center", color=INK, fontsize=9)
-    ax.set_xlabel("trigger gap (m)"); ax.set_ylabel("target speed − ego speed (km/h)")
-    ax.set_xlim(0, ncol); ax.set_ylim(nrow, -1.4); ax.tick_params(length=0)
+    ax.set_xlabel("trigger gap (m)"); ax.set_ylabel("target − ego\nspeed (km/h)")
+    ax.set_xlim(0, ncol); ax.set_ylim(nrow, -1.6); ax.tick_params(length=0)
     for s in ax.spines.values():
         s.set_visible(False)
     handles = [Rectangle((0, 0), 1, 1, color=CLASS_STYLE[k][1]) for k in CLASS_STYLE]
     labels = [f"{ABBR[k]}  {CLASS_STYLE[k][0]}" for k in CLASS_STYLE]
-    ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=4, frameon=False, fontsize=8.5,
-              title="grey = invalid      blue = useful, by how hard the ego must brake      red = unavoidable", title_fontsize=8.5)
+    ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.25), ncol=4, frameon=False, fontsize=8.5)
     fig.tight_layout(); fig.savefig(out / "fig2_grid.png", dpi=200, bbox_inches="tight"); plt.close(fig)
 
 

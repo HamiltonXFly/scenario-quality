@@ -1,33 +1,30 @@
 # scenario-quality
 
-Checks whether generated driving scenarios are actually useful as simulation tests.
+How many scenarios from a parameter sweep are actually useful as simulation tests?
 
-I wrote a parameter sweep for a simple highway cut-in (a car merges into the ego lane), exported every combination as an OpenSCENARIO file, ran them in [esmini](https://github.com/esmini/esmini) and checked each run for three things:
+I generated 144 highway cut-ins (a car merges into the ego lane) as OpenSCENARIO files, ran them in [esmini](https://github.com/esmini/esmini) and checked each run:
 
-1. Is the scenario valid? It has to run, start in a consistent state, move in a physically plausible way, and the cut-in has to actually happen.
-2. Does the ego have to react at all?
-3. How critical is it? Measured as how hard the ego would have to brake after a 0.5 s reaction time.
+1. Valid: it runs, starts consistently, moves plausibly, and the cut-in actually happens.
+2. Relevant: the ego has to react.
+3. Criticality: how hard the ego would have to brake after a 0.5 s reaction time.
 
 ![Three of the scenarios in esmini](docs/cutin_examples.gif)
 
-Top: a useful test. Middle: the car merges so close that a crash is unavoidable. Bottom: a 1 s lane change, which no real car does.
-
 ## Results
 
-Of 144 generated scenarios, 57 are valid, 39 require a reaction, and 27 are still passable. Many of those are near-duplicates (same speed difference, gap and lane-change time, only the ego speed differs), which leaves 9 distinct tests.
+57 of 144 are valid, 39 need a reaction, 27 are still passable, and only 9 of those are not near-duplicates.
 
 ![Funnel](docs/fig1_funnel.png)
 
 ![Verdict per scenario](docs/fig2_grid.png)
 
-Some things I did not expect:
+Shown for an ego speed of 100 km/h. The verdicts are identical at 80 and 120 km/h, which is why so many scenarios are near-duplicates.
+
+Things I did not expect:
 
 - 54 scenarios never trigger the cut-in. The trigger is "gap below X m", and if the other car is not slower than the ego, the gap never shrinks.
 - All 1 s lane changes are implausible (14 to 18 m/s² lateral acceleration).
-- The ego speed makes no difference to the criticality class here, because the required braking only depends on relative speed and gap.
 - A slower lane change makes the cut-in more critical, not less: the car enters the lane later, when the gap is already smaller.
-
-![Example trajectories](docs/fig3_examples.png)
 
 ## Does the checker catch bugs?
 
@@ -50,16 +47,11 @@ Changing one threshold at a time (reaction time, lateral acceleration limit, rel
 
 ## Notes
 
-- My first version drove the ego with esmini's built-in ACC controller. It braked from 100 km/h to under 10 km/h in about one second, which is not physically possible, so the criticality numbers were meaningless. I switched to a constant-speed ego and compute the required braking instead. This measures the scenario, not a particular driving function.
+- My first version drove the ego with esmini's ACC controller. It braked from 100 km/h to under 10 km/h in about one second, which is physically impossible, so I switched to a constant-speed ego and compute the required braking instead. This rates the scenario, not a driving function.
 - Three scenarios I expected to be fine were rejected. In those, the ego is already next to the other car when it starts to merge, so the checker was right.
+- One manoeuvre, straight road, one simulator. Thresholds are defaults, not calibrated on real driving data.
 
-## Limitations
-
-- Only one manoeuvre, on a straight road, in one simulator.
-- Thresholds are reasonable defaults, not calibrated on real driving data.
-- "Near-duplicate" is defined by parameters. A real driving function might behave differently at 80 and 120 km/h.
-
-Next things I want to try: running the same files in CARLA ScenarioRunner to see whether the verdicts agree, and checking scenarios written by an LLM from text descriptions.
+Next: run the same files in CARLA ScenarioRunner to see whether the verdicts agree, and check scenarios written by an LLM.
 
 ## Usage
 
