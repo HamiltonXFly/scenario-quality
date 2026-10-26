@@ -31,11 +31,18 @@ class CutIn:
     gap_m: float           # trigger: longitudinal free-space gap below this value
     t_lc_s: float          # lane-change duration (sinusoidal)
     defect: str = "none"   # seeded defect, see DEFECTS
+    level: float | None = None   # defect severity; None = the default in DEFECT_DEFAULT
 
     @property
     def name(self) -> str:
         n = f"cutin_v{self.v_ego_kmh:g}_dv{self.dv_kmh:+g}_g{self.gap_m:g}_t{self.t_lc_s:g}"
-        return n if self.defect == "none" else f"{n}__{self.defect}"
+        if self.defect == "none":
+            return n
+        return f"{n}__{self.defect}" + ("" if self.level is None else f"_{self.level:g}")
+
+    @property
+    def lvl(self) -> float:
+        return DEFECT_DEFAULT[self.defect] if self.level is None else self.level
 
 
 GRID = dict(
@@ -46,14 +53,19 @@ GRID = dict(
 )
 
 # Defects injected into otherwise valid scenarios to test the checker itself.
+# Each has a severity level; DEFECT_DEFAULT is the obvious version of the bug.
 DEFECTS = {
-    "spawn_overlap": "target spawned inside the ego vehicle",
-    "off_road": "target spawned outside the drivable road",
-    "teleport": "target jumps 30 m forward mid-scenario",
-    "dead_trigger": "cut-in trigger can never fire",
-    "unit_error": "target speed written in km/h instead of m/s",
-    "snap_lane_change": "lane change in 0.3 s",
+    "spawn_overlap": "target spawned overlapping the ego by <level> m",
+    "off_road": "target spawned with its outer edge <level> m beyond the road edge",
+    "teleport": "target jumps <level> m forward mid-scenario",
+    "dead_trigger": "cut-in trigger gap set to <level> m, so it can never fire",
+    "unit_error": "target speed multiplied by <level> (3.6 = km/h written as m/s)",
+    "snap_lane_change": "lane change takes <level> s",
 }
+DEFECT_DEFAULT = {"spawn_overlap": 3.6, "off_road": 7.0, "teleport": 30.0, "dead_trigger": 0.01,
+                  "unit_error": 3.6, "snap_lane_change": 0.3}
+CAR_LENGTH = 4.6
+TARGET_EDGE_GAP = LANE_WIDTH / 2 - 1.9 / 2   # distance from the target's outer edge to the road edge
 
 
 def grid() -> list[CutIn]:
@@ -89,11 +101,11 @@ def build(c: CutIn, road_file: str) -> xosc.Scenario:
     step = xosc.TransitionDynamics(xosc.DynamicsShapes.step, xosc.DynamicsDimension.time, 0)
     tgt_s, tgt_lane, tgt_offset = EGO_S0 + TARGET_DX0, -2, 0.0
     if c.defect == "unit_error":
-        vt = c.v_ego_kmh + c.dv_kmh
+        vt = vt * c.lvl
     if c.defect == "spawn_overlap":
-        tgt_s, tgt_lane = EGO_S0 + 1.0, -1
+        tgt_s, tgt_lane = EGO_S0 + CAR_LENGTH - c.lvl, -1
     if c.defect == "off_road":
-        tgt_offset = -2.5 * LANE_WIDTH
+        tgt_offset = -(TARGET_EDGE_GAP + c.lvl)
 
     init = xosc.Init()
     init.add_init_action("Ego", xosc.TeleportAction(xosc.LanePosition(EGO_S0, 0, -1, 0)))
@@ -101,8 +113,8 @@ def build(c: CutIn, road_file: str) -> xosc.Scenario:
     init.add_init_action("Target", xosc.TeleportAction(xosc.LanePosition(tgt_s, tgt_offset, tgt_lane, 0)))
     init.add_init_action("Target", xosc.AbsoluteSpeedAction(vt, step))
 
-    gap = 0.01 if c.defect == "dead_trigger" else c.gap_m
-    t_lc = 0.3 if c.defect == "snap_lane_change" else c.t_lc_s
+    gap = c.lvl if c.defect == "dead_trigger" else c.gap_m
+    t_lc = c.lvl if c.defect == "snap_lane_change" else c.t_lc_s
     lc = xosc.AbsoluteLaneChangeAction(-1, xosc.TransitionDynamics(
         xosc.DynamicsShapes.sinusoidal, xosc.DynamicsDimension.time, t_lc))
     cond = xosc.RelativeDistanceCondition(gap, xosc.Rule.lessThan, xosc.RelativeDistanceType.longitudinal,
@@ -115,7 +127,7 @@ def build(c: CutIn, road_file: str) -> xosc.Scenario:
     man.add_event(ev)
     if c.defect == "teleport":
         jump = xosc.Event("jump", xosc.Priority.parallel)
-        jump.add_action("teleport", xosc.TeleportAction(xosc.RelativeLanePosition(0, "Target", 0, ds=30)))
+        jump.add_action("teleport", xosc.TeleportAction(xosc.RelativeLanePosition(0, "Target", 0, ds=c.lvl)))
         jump.add_trigger(xosc.ValueTrigger("t", 0, xosc.ConditionEdge.rising,
                                            xosc.SimulationTimeCondition(12, xosc.Rule.greaterThan)))
         man.add_event(jump)

@@ -28,18 +28,11 @@ Things I did not expect:
 
 ## Does the checker catch bugs?
 
-I took the 57 scenarios that passed and broke each of them in six ways:
+I took the 57 scenarios that passed and broke each one on purpose, from barely noticeable to obvious.
 
-| Bug | Caught |
-|---|---|
-| cars spawned inside each other | 57 / 57 |
-| car spawned off the road | 57 / 57 |
-| car teleports 30 m | 57 / 57 |
-| lane change in 0.3 s | 57 / 57 |
-| trigger that can never fire | 57 / 57 |
-| speed written in km/h instead of m/s | 55 / 57 |
+![Share of broken files rejected, by bug size](docs/fig4_defect_sweep.png)
 
-The two misses are unit errors where 40 km/h became 144 km/h. That is still a normal highway speed, so a physics check cannot see it.
+Obvious bugs are always caught, but every check has a blind spot below its threshold: a 20 cm jump or a car 2 cm off the road passes. Wrong speeds are the real weak point. A speed that is 20% too high is never flagged by the speed check, and a factor of 2 only in 18 of 57 files. Most of the other rejections are luck: the wrong speed happens to break the cut-in, which a different check notices.
 
 ## How sensitive is this to my thresholds?
 

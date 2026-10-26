@@ -145,6 +145,38 @@ def examples(logs: Path, df: pd.DataFrame, out: Path) -> None:
     fig.tight_layout(); fig.savefig(out / "fig3_examples.png", dpi=200, bbox_inches="tight"); plt.close(fig)
 
 
+SWEEP_PANELS = [
+    ("teleport", "car jumps forward (m)", lambda v: f"{v:g}"),
+    ("off_road", "car starts off the road (cm)", lambda v: f"{v * 100:g}"),
+    ("snap_lane_change", "lane change duration (s)", lambda v: f"{v:g}"),
+    ("unit_error", "speed off by factor", lambda v: f"×{v:g}"),
+    ("spawn_overlap", "cars overlap at start (m)", lambda v: f"{v:g}"),
+]
+
+
+def defect_sweep(out: Path, docs: Path) -> None:
+    t = pd.read_csv(out / "defect_sweep.csv")
+    fig, axes = plt.subplots(1, len(SWEEP_PANELS), figsize=(12, 2.6), sharey=True)
+    for ax, (d, title, fmt) in zip(axes, SWEEP_PANELS):
+        s = t[t.defect == d].sort_values("level", ascending=d != "snap_lane_change")
+        x = np.arange(len(s))
+        right = s.caught_by_intended_check / s.n * 100
+        other = (s.caught - s.caught_by_intended_check) / s.n * 100
+        ax.bar(x, right, color="#2a78d6", width=0.7, label="caught by the check meant for it")
+        ax.bar(x, other, bottom=right, color="#b9d3f2", width=0.7, label="caught by another check")
+        ax.set_xticks(x, [fmt(v) for v in s.level], fontsize=8)
+        ax.set_title(title, fontsize=9.5, color=INK, loc="left")
+        ax.set_ylim(0, 105); ax.tick_params(length=0)
+        ax.spines[["top", "right"]].set_visible(False); ax.spines[["left", "bottom"]].set_color(GRID)
+        ax.yaxis.grid(True, color=GRID); ax.set_axisbelow(True)
+    axes[0].set_ylabel("% of 57 broken files rejected", fontsize=8.5)
+    axes[0].set_yticks([0, 50, 100], ["0", "50", "100"])
+    axes[0].legend(frameon=False, fontsize=8, loc="lower left", bbox_to_anchor=(0, 1.12), ncol=2)
+    fig.text(0.5, 0.04, "smaller bug  →  larger bug", ha="center", fontsize=8.5, color=MUTED)
+    fig.subplots_adjust(left=0.06, right=0.99, bottom=0.2, top=0.72, wspace=0.25)
+    fig.savefig(docs / "fig4_defect_sweep.png", dpi=200, bbox_inches="tight"); plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, default=Path("outputs"))
@@ -155,6 +187,8 @@ def main() -> None:
     steps = funnel(df, args.docs)
     grid_map(df, args.docs)
     examples(args.out / "grid" / "logs", df, args.docs)
+    if (args.out / "defect_sweep.csv").exists():
+        defect_sweep(args.out, args.docs)
     (args.docs / "funnel.json").write_text(json.dumps(steps, indent=1))
     print(json.dumps(steps, indent=1))
 

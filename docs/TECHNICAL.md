@@ -111,6 +111,18 @@ The two missed mutants have a target speed of 40 m/s (144 km/h) after the error,
 
 Sanity check in the other direction: of 60 scenarios that were valid by design (lane change ≥ 2 s and a trigger that can fire), 3 were rejected. All 3 are true problems (the ego is already alongside the target), not false alarms.
 
+**Severity sweep.** The fixed defects above are deliberately obvious, so the 340 / 342 mainly shows that each check is wired up. To find the blind spots, each defect was also injected at several sizes into the same 57 scenarios (`reports/defect_sweep.csv`). "Intended check" is the check designed for that defect; other rejections happen because the defect breaks something else.
+
+| Defect | Size | Rejected | By intended check |
+|---|---|---|---|
+| Teleport | 0.1 / 0.2 / 0.3 m | 0 / 0 / 57 | 0 / 0 / 57 |
+| Off road | 2 / 10 cm | 12 / 57 | 0 / 57 |
+| Lane change duration | 1.9 / 1.7 s | 7 / 57 | 7 / 57 |
+| Speed factor | ×1.2 / ×1.5 / ×2 / ×3.6 | 10 / 25 / 45 / 55 | 0 / 2 / 18 / 50 |
+| Spawn overlap | 0.1 m and above | 57 | 57 |
+
+Geometric checks have sharp thresholds that follow directly from their tolerances (0.3 m jump at 0.05 s steps exceeds the 5 m/s speed mismatch; 5 cm road-edge tolerance). The speed plausibility check is weak: it only fires above 200 km/h, so moderate speed errors pass it and are rejected, if at all, only because they prevent the cut-in.
+
 ### 4.4 Sensitivity
 
 The logged runs were re-assessed with one assumption changed at a time (`scripts/sensitivity.py`, no new simulation):
